@@ -2,7 +2,7 @@
 
 面向人文社科研究的 AI 知识处理工作流（skill 体系），运行于 CodeBuddy / WorkBuddy 等国产 agent 工具。
 
-> 让 AI 替你打工，让人文社科生早点下班。
+> 让 AI 替你打工，让人文社科生早点收工。
 
 > **English**: Wenshu (文枢) is an AI knowledge-processing workflow for humanities & social sciences, running inside CodeBuddy / WorkBuddy. It turns literature management, citation formatting, and theoretical lineage mapping into executable workflows with traceable sources. Local-first, MIT licensed.
 
@@ -82,5 +82,7 @@ AI 辅助非代写；引文可溯源、不编造；遵守学术诚信。
 MIT
 
 ## 版本
+
+v0.1.1（2026-08-19）：自研 skill_rag.py 转正（LightRAG 降为对照参考）；slogan 更新；毛选全量复现与 galaxy 演示上线
 
 v0.1.0（2026-08-16）：references/ + workflows/ 产出，skill 骨架搭建
