@@ -1,0 +1,294 @@
+#!/usr/bin/env python3
+"""toc_parse.py — 文枢通用入库流程 S2：目录解析（双通道）
+
+从 pdf_extract.py 输出的 page_*.txt 解析篇目清单：
+  通道 A：目录页解析（定位每卷目录区间 → 篇目 + 页码范围 + 卷归属）
+  通道 B：正文标题扫描（孤立页码 + 标题行 → 篇目起始页）
+  合并：A 骨架 + B 校正/补漏，冲突标"需人工确认"
+
+用法：
+    python toc_parse.py --input 提取目录 --output 清单.json [--verbose]
+
+输出：
+    <output>.json                篇目清单 [{title, volume, book_start, book_end}]
+    <output>_report.json         双通道对比报告
+"""
+import argparse
+import json
+import pathlib
+import re
+
+# ========== 目录页识别 ==========
+
+# 目录行：纯"目录" 或 "目 录 N"（带页码）
+DIRECTORY_RE = re.compile(r"^(目\s*录|目录)(?:\s*\d{1,3})?\s*$")
+PERIOD_RE = re.compile(r"(第[一二三四五]次国内革命战争时期|抗日战争时期|解放战争时期|社会主义革命和建设时期)")
+VOL_RE = re.compile(r"第[一二三四五]卷")
+
+# 篇目行：篇名（年份）…… 页码范围；容忍 OCR 空格
+PAGE_RANGE_RE = re.compile(r"(\d[\d ]*)\s*(?:—|–|-)\s*(\d{1,4})\s*$")
+
+# 页眉：页码 + 毛泽东选[集/栠/粲] + 时期/卷
+HEADER_RE = re.compile(r"^\d+\s*毛泽东选[集栠粲桀]*\s*(?:第[一二三四五]\s*卷)?[^\n]*$")
+
+
+def norm_num(s: str) -> int:
+    return int(re.sub(r"\s", "", s))
+
+
+def is_toc_page(text: str) -> bool:
+    """判断是否目录页：首行是'目录'(可带页码) 或 页内含'目录'+篇目行特征。"""
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    if not lines:
+        return False
+    if DIRECTORY_RE.match(lines[0]):
+        return True
+    # 页首含"毛泽东选X第X卷"（目录页眉）+ 页内有页码范围行
+    if len(lines) > 2 and re.search(r"目录", lines[0]):
+        return True
+    return False
+
+
+def _page_num(pname: str) -> int:
+    """从 'page_0001.txt' 提取页码。"""
+    m = re.search(r"page_(\d+)\.txt", pname)
+    return int(m.group(1)) if m else 0
+
+
+def find_toc_ranges(pages: dict) -> list[dict]:
+    """扫描全部页，定位目录区间（可能多卷各自有目录）。
+    返回 [{start, end, volume}]，按 start 排序。"""
+    # 候选目录页
+    cands = []
+    for pname, text in sorted(pages.items()):
+        pg = _page_num(pname)
+        if is_toc_page(text):
+            cands.append(pg)
+
+    # 合并连续候选页为区间（间隔 ≤ 3 视为同一目录）
+    ranges = []
+    for pg in cands:
+        if ranges and pg - ranges[-1]["end"] <= 3:
+            ranges[-1]["end"] = pg
+        else:
+            ranges.append({"start": pg, "end": pg})
+
+    # 识别卷：目录区间前最近的"第X卷"扉页/页眉
+    for rng in ranges:
+        rng["volume"] = detect_volume(pages, rng["start"])
+    return ranges
+
+
+def detect_volume(pages: dict, toc_start: int) -> str:
+    """从目录区间前几页找卷号（扉页'第X卷'或目录页眉）。"""
+    for pg in range(toc_start - 1, max(1, toc_start - 8), -1):
+        pname = f"page_{pg:04d}.txt"
+        text = pages.get(pname, "")
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        for l in lines[:5]:
+            m = VOL_RE.search(l)
+            if m:
+                return m.group(0)
+    return ""
+
+
+# ========== 通道 A：目录页解析 ==========
+
+def parse_toc_page(text: str, volume: str) -> list[dict]:
+    """解析单个目录页 → 篇目条目 [{title, book_start, book_end}]。"""
+    entries = []
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    for line in lines:
+        m = PAGE_RANGE_RE.search(line)
+        if not m:
+            continue
+        start, end = norm_num(m.group(1)), int(m.group(2))
+        if end < start or end - start > 400:
+            continue
+        title = clean_toc_title(line)
+        if len(title) < 3:
+            continue
+        entries.append({"title": title, "book_start": start, "book_end": end,
+                        "volume": volume})
+    return entries
+
+
+def clean_toc_title(line: str) -> str:
+    """清理目录行篇名：去省略号、去尾部页码、压缩 OCR 空格。"""
+    t = re.sub(r"[…．．．·…]+.*$", "", line)
+    t = re.sub(r"[\d ]+\s*(?:—|–|-)\s*[\d ]+\s*$", "", t)
+    # 压缩中文间空格（OCR 产生）
+    t = re.sub(r"(?<=[\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])", "", t)
+    return t.strip()
+
+
+# ========== 通道 B：正文标题扫描（独立精确扫描） ==========
+
+def scan_body_titles(pages: dict, toc_ranges: list[dict]) -> list[dict]:
+    """扫描正文页：孤立页码行 + 下一行短中文标题（独立扫描，提取完整篇名）。
+    规则：页首孤立数字（书内页码）+ 下一行中文标题（≤35字、不以句号结尾、
+    不含页眉）。返回 [{title, pdf_page, book_page}]。"""
+    toc_pages = set()
+    for r in toc_ranges:
+        toc_pages.update(range(r["start"], r["end"] + 1))
+
+    hits = []
+    for pname, text in sorted(pages.items()):
+        pg = _page_num(pname)
+        if pg in toc_pages:
+            continue
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        if len(lines) < 2:
+            continue
+        if not re.fullmatch(r"\d{1,4}", lines[0]):
+            continue
+        title = lines[1]
+        # 标题特征：中文开头、3-35字、不以句号/问号/点号结尾、非页眉
+        if not title or "毛泽东选" in title:
+            continue
+        if re.search(r"[。！？；．，、]$", title):
+            continue
+        if not re.match(r"^[\u4e00-\u9fff《》]", title):
+            continue
+        if not (3 <= len(title) <= 35):
+            continue
+        hits.append({"title": title, "pdf_page": pg, "book_page": int(lines[0])})
+    return hits
+
+
+# ========== 合并 ==========
+
+def merge(toc_entries: list[dict], body_hits: list[dict],
+          toc_ranges: list[dict] = None) -> dict:
+    """合并双通道结果。
+    body_hits（通道 B）：完整篇名 + 起始页 → 权威骨架
+    toc_entries（通道 A）：页码范围（book_start/book_end）+ 卷归属 → 补充
+    合并：B 的篇名 + A 的页码范围/卷；B 无匹配范围的保留（范围 S4 推算）。
+    返回 {works, conflicts, report}。"""
+    # 通道 A 页码索引：book_start → 条目
+    a_by_start = {}
+    for e in toc_entries:
+        a_by_start.setdefault(e["book_start"], []).append(e)
+
+    works = []
+    used_a = set()
+    for h in body_hits:
+        title = re.sub(r"[．。，、＊*]+$", "", h["title"]).strip()
+        book_start = h["book_page"]
+        # 匹配 A 的页码范围（起始页精确或 ±2 内）
+        match = None
+        for delta in range(0, 3):
+            for e in a_by_start.get(book_start + delta, []):
+                match = e
+                break
+            if match:
+                break
+        if match:
+            used_a.add(id(match))
+            works.append({
+                "title": title,
+                "volume": match["volume"],
+                "book_start": match["book_start"],
+                "book_end": match["book_end"],
+                "pdf_start": h["pdf_page"],
+            })
+        else:
+            # 无范围匹配：保留，范围留空（S4 用下一篇推算）
+            works.append({
+                "title": title,
+                "volume": "",
+                "book_start": book_start,
+                "book_end": None,
+                "pdf_start": h["pdf_page"],
+            })
+
+    # 通道 A 中未被 B 匹配的条目：只贡献页码范围，不产生新篇名。
+    # （A 的目录行篇名残缺，不是可靠来源；B 未扫到的篇目由 S4 用
+    #  "下一篇起始页" 推算，或质量门人工补充。）
+
+    # 卷推断：volume 为空的，按 pdf_start 落在哪个目录区间后归属
+    toc_ranges_sorted = sorted(toc_ranges or [], key=lambda x: x["start"])
+    for w in works:
+        if w.get("volume"):
+            continue
+        anchor = w.get("pdf_start") or (w.get("book_start", 0) + 0)
+        vol = ""
+        for rng in toc_ranges_sorted:
+            if anchor and anchor >= rng["start"]:
+                vol = rng["volume"]
+        w["volume"] = vol
+
+    works.sort(key=lambda x: (x.get("book_start") or 0))
+    # 去重（同 title 保留范围更全的）
+    seen = {}
+    for w in works:
+        key = w["title"]
+        if key not in seen or (w["book_end"] and not seen[key].get("book_end")):
+            seen[key] = w
+    works = list(seen.values())
+    works.sort(key=lambda x: (x.get("book_start") or 0))
+
+    report = {
+        "toc_entries": len(toc_entries),
+        "body_hits": len(body_hits),
+        "merged": len(works),
+        "matched": len([w for w in works if w.get("book_end")]),
+        "unmatched": len([w for w in works if not w.get("book_end")]),
+        "conflicts": [],
+    }
+    return {"works": works, "report": report}
+
+
+def main():
+    parser = argparse.ArgumentParser(description="文枢 S2：目录解析（双通道）")
+    parser.add_argument("--input", required=True, help="提取目录（含 page_*.txt）")
+    parser.add_argument("--output", required=True, help="输出 JSON 路径")
+    parser.add_argument("--verbose", action="store_true")
+    args = parser.parse_args()
+
+    in_dir = pathlib.Path(args.input)
+    pages = {}
+    for f in sorted(in_dir.glob("page_*.txt")):
+        pages[f.name] = f.read_text(encoding="utf-8")
+    print(f"[加载] {len(pages)} 页")
+
+    # 定位目录区间
+    toc_ranges = find_toc_ranges(pages)
+    print(f"[目录] 定位到 {len(toc_ranges)} 个目录区间")
+    for r in toc_ranges:
+        print(f"  {r['volume'] or '?'} 目录: 页 {r['start']}-{r['end']}")
+
+    # 通道 A
+    toc_entries = []
+    for r in toc_ranges:
+        for pg in range(r["start"], r["end"] + 1):
+            toc_entries.extend(parse_toc_page(pages.get(f"page_{pg:04d}.txt", ""), r["volume"]))
+    print(f"[通道A] 目录解析 {len(toc_entries)} 条")
+
+    # 通道 B：正文标题扫描（独立精确扫描，提取完整篇名）
+    body_hits = scan_body_titles(pages, toc_ranges)
+    print(f"[通道B] 正文标题扫描 {len(body_hits)} 条")
+
+    # 合并
+    result = merge(toc_entries, body_hits, toc_ranges)
+    works = result["works"]
+
+    # 输出
+    out = pathlib.Path(args.output)
+    out.write_text(json.dumps(works, ensure_ascii=False, indent=2), encoding="utf-8")
+    report_path = out.with_name(out.stem + "_report.json")
+    report_path.write_text(json.dumps(result["report"], ensure_ascii=False, indent=2),
+                           encoding="utf-8")
+    print(f"\n[合并] {len(works)} 篇（正文标题 {result['report']['body_hits']} + 目录补充，"
+          f"有范围 {result['report']['matched']} / 无范围 {result['report']['unmatched']}）")
+    print(f"清单: {out}")
+    print(f"报告: {report_path}")
+
+    # 质量门：篇目数阈值
+    if len(works) < 5:
+        raise SystemExit("[FAIL] 篇目数 < 5，目录解析失败")
+    print(f"[OK] 篇目数 {len(works)} ≥ 5")
+
+
+if __name__ == "__main__":
+    main()
