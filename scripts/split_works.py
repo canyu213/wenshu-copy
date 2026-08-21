@@ -19,14 +19,42 @@ import argparse
 import json
 import pathlib
 import re
+from collections import Counter
+
+
+def detect_headers(pages: dict, min_ratio: float = 0.3, min_count: int = 2) -> set[str]:
+    """跨页高频行检测（期刊页眉：刊名/期号/卷号逐页重复）。
+
+    规范化：去空白、去表格管道符与边框；行长度 4-60 字且非纯数字。
+    出现 ≥ max(min_count, 总页数×min_ratio) 次 → 判为页眉。
+    min_count=2：小文件（3-5 页单篇论文）页眉在多数页出现即可识别；
+    正文短句跨页逐字重复罕见，误判风险低。
+    """
+    counts = Counter()
+    for text in pages.values():
+        for line in text.splitlines():
+            norm = re.sub(r"[\s|┃│—-]+", "", line).strip()
+            if 4 <= len(norm) <= 60 and not re.fullmatch(r"\d{1,4}", norm):
+                counts[norm] += 1
+    threshold = max(min_count, int(len(pages) * min_ratio))
+    return {line for line, c in counts.items() if c >= threshold}
+
 
 HEADER_RE = re.compile(r"^\d+\s*毛泽东选[集栠粲桀]*\s*(?:第[一二三四五]\s*卷)?[^\n]*\n")
 
 
-def clean_page(text: str) -> str:
-    """清理单页：去页眉、去孤立页码行、保留自然段落。"""
+def clean_page(text: str, headers: set[str] | None = None) -> str:
+    """清理单页：去页眉（毛选硬编码 + 跨页高频行）、去孤立页码行、保留自然段落。"""
     t = text.strip()
     t = HEADER_RE.sub("", t, count=1)
+    if headers:
+        kept = []
+        for line in t.split("\n"):
+            norm = re.sub(r"[\s|┃│—-]+", "", line).strip()
+            if norm in headers:
+                continue
+            kept.append(line)
+        t = "\n".join(kept)
     lines = t.split("\n")
     if lines and lines[0].strip().isdigit():
         lines = lines[1:]
@@ -109,7 +137,7 @@ def load_pages(extracted: pathlib.Path) -> dict:
     return pages
 
 
-def split_work(w: dict, pages: dict, total_pages: int) -> dict:
+def split_work(w: dict, pages: dict, total_pages: int, headers: set[str] | None = None) -> dict:
     """切出单篇：逐页清理 + 页码锚点信息。"""
     out_pages = []
     empty_blocks = 0
@@ -117,7 +145,7 @@ def split_work(w: dict, pages: dict, total_pages: int) -> dict:
         if pg > total_pages:
             break
         text = pages.get(pg, "")
-        body = clean_page(text)
+        body = clean_page(text, headers)
         if not body:
             empty_blocks += 1
             continue
@@ -158,8 +186,17 @@ def main():
     total_pages = len(pages)
     print(f"[加载] {len(works)} 篇，{total_pages} 页")
 
+    # 跨页高频行检测（期刊页眉剥离）
+    headers = detect_headers(pages)
+    if headers:
+        print(f"[页眉] 检测到 {len(headers)} 条高频行（跨页重复，将剥离）：")
+        for h in sorted(headers)[:5]:
+            print(f"    {h[:40]}")
+    else:
+        print("[页眉] 未检测到跨页高频行")
+
     ranged = compute_ranges(works, vol_offset, total_pages)
-    split = [split_work(w, pages, total_pages) for w in ranged]
+    split = [split_work(w, pages, total_pages, headers) for w in ranged]
 
     errors = validate(split, total_pages)
     if errors:

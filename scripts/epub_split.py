@@ -211,8 +211,11 @@ def main():
     (out_dir / "epub_chapters.json").write_text(
         json.dumps([{"idx": i + 1, "title": w["title"]} for i, w in enumerate(works)],
                    ensure_ascii=False, indent=2), encoding="utf-8")
+    payload = {"_meta": {"source": "epub_split", "anchor_semantics": "paragraph",
+                         "note": "EPUB 无页码：book_page 为章节内自然段序号"},
+               "works": works}
     (out_dir / "split_works.json").write_text(
-        json.dumps(works, ensure_ascii=False, indent=2), encoding="utf-8")
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
     total = sum(w["book_end"] for w in works)
     print(f"[OK] {len(works)} 章 / {total} 段")

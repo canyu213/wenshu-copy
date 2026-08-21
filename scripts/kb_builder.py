@@ -76,7 +76,7 @@ def strip_header(text: str, title: str) -> str:
     return "\n".join(lines)
 
 
-def build_md(work: dict, tags: list[str]) -> tuple[str, str, str]:
+def build_md(work: dict, tags: list[str], anchor_semantics: str = "page") -> tuple[str, str, str]:
     """为单篇生成 md，返回 (卷目录名, 文件名, 内容)。"""
     title = work["title"].rstrip("＊* ").strip()
     volume = work.get("volume") or ""
@@ -96,6 +96,7 @@ def build_md(work: dict, tags: list[str]) -> tuple[str, str, str]:
     lines.append("edition: [待补]")
     if tags:
         lines.append("tags: " + ", ".join(f'"{t}"' for t in tags))
+    lines.append(f"anchor_semantics: {anchor_semantics}")
     lines.append("block_id_format: ^v{卷号2位}p{书内页码4位}")
     lines.append("---")
     lines.append("")
@@ -139,13 +140,17 @@ def main() -> int:
         return 1
 
     works = json.loads(split_path.read_text(encoding="utf-8"))
-    print(f"[S5] 输入 {len(works)} 篇")
+    # 兼容两种 split_works 结构：{works: [...]}（带 _meta）或纯 list
+    meta = works.get("_meta", {}) if isinstance(works, dict) else {}
+    works = works.get("works", works) if isinstance(works, dict) else works
+    anchor_semantics = meta.get("anchor_semantics", "page")  # page（PDF 页码）/ paragraph（EPUB 段号）
+    print(f"[S5] 输入 {len(works)} 篇（锚点语义: {anchor_semantics}）")
 
     # 预生成全部 md
     generated = []  # [(vol, fname, content)]
     errors = []
     for w in works:
-        vol, fname, content = build_md(w, tags)
+        vol, fname, content = build_md(w, tags, anchor_semantics)
         anchors = len(re.findall(r"^\^v[0-9]{2}p[0-9]{4}$", content, re.M))
         generated.append((vol, fname, content))
         if anchors == 0:
