@@ -359,19 +359,23 @@ def search(query: str, out_dir: pathlib.Path, top_k: int = 8) -> list[dict]:
 def answer(query: str, hits: list[dict], graph_ctx: str = "") -> str:
     ctx = []
     for h in hits:
-        ctx.append(f"[{h['rel']}#{h['anchor']}]\n{h['content']}")
-    prompt = f"""你是文枢知识库问答助手。基于以下检索到的文献片段回答问题。
-
-要求：
-1. 只依据给定片段，不要编造
-2. 回答中用 [[路径#锚点]] 标注引用来源
-3. 片段不足时明确说明"依据有限"
-4. {('同时参考以下概念关系（来自谱系图谱）：\n' + graph_ctx) if graph_ctx else ''}
-
-检索片段：
-{chr(10).join(ctx[:6])}
-
-问题：{query}"""
+        ctx.append("[" + h["rel"] + "#" + h["anchor"] + "]\n" + h["content"])
+    lines = []
+    lines.append("你是文枢知识库问答助手。基于以下检索到的文献片段回答问题。")
+    lines.append("")
+    lines.append("要求：")
+    lines.append("1. 只依据给定片段，不要编造")
+    lines.append("2. 回答中用 [[路径#锚点]] 标注引用来源")
+    lines.append("3. 片段不足时明确说明\"依据有限\"")
+    if graph_ctx:
+        lines.append("4. 同时参考以下概念关系（来自谱系图谱）：")
+        lines.append(graph_ctx)
+    lines.append("")
+    lines.append("检索片段：")
+    lines.extend(ctx[:6])
+    lines.append("")
+    lines.append("问题：" + query)
+    prompt = "\n".join(lines)
     return llm_chat(prompt)
 
 
