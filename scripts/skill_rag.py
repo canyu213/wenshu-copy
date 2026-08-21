@@ -122,8 +122,31 @@ def parse_md(f: pathlib.Path) -> tuple[str, str, list[dict]]:
     return title, rel, blocks
 
 
+def split_long_block(content: str, max_len: int = 900) -> list[str]:
+    """大块自动分段（chunks 粒度均衡）：超长段按句边界拆分，避免单篇命中偏斜。
+
+    外二篇 203 段场景：单块 >max_len 时按「。！？；」句边界切成 ≤max_len 的块。
+    不改变锚点（同 anchor 多块），只影响检索粒度。
+    """
+    if len(content) <= max_len:
+        return [content]
+    parts = []
+    buf = ""
+    for seg in re.split(r"(?<=[。！？；])", content):
+        buf += seg
+        if len(buf) >= max_len:
+            parts.append(buf)
+            buf = ""
+    if buf:
+        parts.append(buf)
+    if len(parts) == 1:
+        # 无句号兜底：按固定长度硬切
+        parts = [content[i:i + max_len] for i in range(0, len(content), max_len)]
+    return parts or [content[:max_len]]
+
+
 def build_index(kb_dir: pathlib.Path, out_dir: pathlib.Path, titles: list[str] | None = None):
-    """对指定篇目构建向量索引。titles 为 None 则全量。"""
+    """对指定篇目构建向量索引。titles 为 None 则全量。超长块自动分段（粒度均衡）。"""
     out_dir.mkdir(parents=True, exist_ok=True)
     want = set(titles) if titles else None
 
@@ -134,8 +157,9 @@ def build_index(kb_dir: pathlib.Path, out_dir: pathlib.Path, titles: list[str] |
             continue
         for b in blocks:
             if b["content"]:
-                chunks.append({"title": title, "rel": rel, "anchor": b["anchor"], "content": b["content"]})
-    print(f"[索引] 收集 {len(chunks)} 块（{len(set(c['title'] for c in chunks))} 篇）")
+                for piece in split_long_block(b["content"]):
+                    chunks.append({"title": title, "rel": rel, "anchor": b["anchor"], "content": piece})
+    print(f"[索引] 收集 {len(chunks)} 块（{len(set(c['title'] for c in chunks))} 篇，超长块已分段）")
 
     texts = [f"{c['content'][:800]}" for c in chunks]
     vecs = np.zeros((len(texts), EMB_DIM), dtype=np.float32)
@@ -292,19 +316,22 @@ def build_graph(kb_dir: pathlib.Path, out_dir: pathlib.Path, titles: list[str] |
         return
 
     def work_title(title):
+        # 重试退避递增（3/6/9s），失败不阻塞其他篇
         for attempt in range(3):
             try:
                 return title, graph_extract(title, works[title])
             except Exception as e:
                 if attempt == 2:
                     return title, {"error": f"{str(e)[:80]}（重试{attempt+1}次仍失败）"}
-                time.sleep(3)
+                time.sleep(3 * (attempt + 1))
 
     t0 = time.time()
+    failed = []
     with ThreadPoolExecutor(max_workers=4) as ex:
         for title, result in ex.map(work_title, pending):
             if "error" in result:
                 print(f"  ❌ {title}: {result['error']}")
+                failed.append(title)
                 continue
             graph["entities"].extend(result["entities"])
             graph["relationships"].extend(result["relationships"])
@@ -312,6 +339,12 @@ def build_graph(kb_dir: pathlib.Path, out_dir: pathlib.Path, titles: list[str] |
             graph_path.write_text(json.dumps(graph, ensure_ascii=False, indent=1), encoding="utf-8")
             prog_path.write_text(json.dumps(sorted(done)), encoding="utf-8")
             print(f"  ✅ {title}: {len(result['entities'])} 实体 / {len(result['relationships'])} 关系")
+
+    if failed:
+        # 失败篇单独记录：下次 --graph-build 自动重试（不在 done 集），也可 --titles 精确续跑
+        failed_path = out_dir / "graph_failed.json"
+        failed_path.write_text(json.dumps(sorted(failed), ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"[图谱] {len(failed)} 篇失败（已记录 {failed_path}；下次运行自动重试）")
 
     seen = set()
     uniq_entities = []
@@ -366,7 +399,8 @@ def answer(query: str, hits: list[dict], graph_ctx: str = "") -> str:
     lines.append("要求：")
     lines.append("1. 只依据给定片段，不要编造")
     lines.append("2. 回答中用 [[路径#锚点]] 标注引用来源")
-    lines.append("3. 片段不足时明确说明\"依据有限\"")
+    lines.append("3. 回答中的每一论断都必须在片段中有对应依据；片段支撑不足的部分，"
+                 "简要说明哪些内容无法从片段确认（不臆测）")
     if graph_ctx:
         lines.append("4. 同时参考以下概念关系（来自谱系图谱）：")
         lines.append(graph_ctx)
