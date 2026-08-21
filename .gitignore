@@ -1,5 +1,3 @@
-.env*
+work_毛选/
+work_实证/
 __pycache__/
-*.pyc
-.venv/
-node_modules/

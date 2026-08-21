@@ -240,9 +240,13 @@ def merge(toc_entries: list[dict], body_hits: list[dict],
 
 
 def main():
-    parser = argparse.ArgumentParser(description="文枢 S2：目录解析（双通道）")
+    parser = argparse.ArgumentParser(description="文枢 S2：目录解析（双通道 + 单篇模式）")
     parser.add_argument("--input", required=True, help="提取目录（含 page_*.txt）")
     parser.add_argument("--output", required=True, help="输出 JSON 路径")
+    parser.add_argument("--single", metavar="标题", nargs="?", const="__auto__",
+                        help="单篇/少量文献模式：整篇=1 篇（省略标题则自动取首页标题）")
+    parser.add_argument("--min-works", type=int, default=5,
+                        help="篇目数下限哨兵（默认 5；单篇/小批文献用 --single 或调低）")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -252,42 +256,74 @@ def main():
         pages[f.name] = f.read_text(encoding="utf-8")
     print(f"[加载] {len(pages)} 页")
 
-    # 定位目录区间
-    toc_ranges = find_toc_ranges(pages)
-    print(f"[目录] 定位到 {len(toc_ranges)} 个目录区间")
-    for r in toc_ranges:
-        print(f"  {r['volume'] or '?'} 目录: 页 {r['start']}-{r['end']}")
+    # 通道 C：单篇模式（整篇 = 1 篇，偏移 0）
+    if args.single is not None:
+        if args.single == "__auto__":
+            # 自动取首页非空标题行（过滤期刊页眉：表格管道符/期卷号/纯数字）
+            first = pages.get("page_0001.txt", "")
+            title = ""
+            for line in first.splitlines():
+                line = line.strip()
+                if not line or re.match(r"^[\d\s]+$", line):
+                    continue
+                if "|" in line or re.search(r"(总第\d+期|年第\d+期|第\d+卷|第\d+期)", line):
+                    continue
+                if 3 <= len(line) <= 40:
+                    title = re.sub(r"[＊*．。]+$", "", line)
+                    break
+            if not title:
+                raise SystemExit("[FAIL] --single 自动取标题失败，请显式传入标题")
+        else:
+            title = args.single
+        works = [{
+            "title": title,
+            "volume": "未分卷",
+            "book_start": 1,
+            "book_end": len(pages),
+            "pdf_start": 1,
+        }]
+        report = {"mode": "single", "toc_entries": 0, "body_hits": 1,
+                  "merged": 1, "matched": 1, "unmatched": 0, "conflicts": []}
+        print(f"[单篇] {title}（{len(pages)} 页，整篇 = 1 篇）")
+    else:
+        # 定位目录区间
+        toc_ranges = find_toc_ranges(pages)
+        print(f"[目录] 定位到 {len(toc_ranges)} 个目录区间")
+        for r in toc_ranges:
+            print(f"  {r['volume'] or '?'} 目录: 页 {r['start']}-{r['end']}")
 
-    # 通道 A
-    toc_entries = []
-    for r in toc_ranges:
-        for pg in range(r["start"], r["end"] + 1):
-            toc_entries.extend(parse_toc_page(pages.get(f"page_{pg:04d}.txt", ""), r["volume"]))
-    print(f"[通道A] 目录解析 {len(toc_entries)} 条")
+        # 通道 A
+        toc_entries = []
+        for r in toc_ranges:
+            for pg in range(r["start"], r["end"] + 1):
+                toc_entries.extend(parse_toc_page(pages.get(f"page_{pg:04d}.txt", ""), r["volume"]))
+        print(f"[通道A] 目录解析 {len(toc_entries)} 条")
 
-    # 通道 B：正文标题扫描（独立精确扫描，提取完整篇名）
-    body_hits = scan_body_titles(pages, toc_ranges)
-    print(f"[通道B] 正文标题扫描 {len(body_hits)} 条")
+        # 通道 B：正文标题扫描（独立精确扫描，提取完整篇名）
+        body_hits = scan_body_titles(pages, toc_ranges)
+        print(f"[通道B] 正文标题扫描 {len(body_hits)} 条")
 
-    # 合并
-    result = merge(toc_entries, body_hits, toc_ranges)
-    works = result["works"]
+        # 合并
+        result = merge(toc_entries, body_hits, toc_ranges)
+        works = result["works"]
+        report = result["report"]
 
     # 输出
     out = pathlib.Path(args.output)
     out.write_text(json.dumps(works, ensure_ascii=False, indent=2), encoding="utf-8")
     report_path = out.with_name(out.stem + "_report.json")
-    report_path.write_text(json.dumps(result["report"], ensure_ascii=False, indent=2),
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2),
                            encoding="utf-8")
-    print(f"\n[合并] {len(works)} 篇（正文标题 {result['report']['body_hits']} + 目录补充，"
-          f"有范围 {result['report']['matched']} / 无范围 {result['report']['unmatched']}）")
+    print(f"\n[合并] {len(works)} 篇（正文标题 {report.get('body_hits', 0)} + 目录补充，"
+          f"有范围 {report.get('matched', 0)} / 无范围 {report.get('unmatched', 0)}）")
     print(f"清单: {out}")
     print(f"报告: {report_path}")
 
-    # 质量门：篇目数阈值
-    if len(works) < 5:
-        raise SystemExit("[FAIL] 篇目数 < 5，目录解析失败")
-    print(f"[OK] 篇目数 {len(works)} ≥ 5")
+    # 质量门：篇目数阈值（--single 跳过；--min-works 可调）
+    if args.single is None and len(works) < args.min_works:
+        raise SystemExit(f"[FAIL] 篇目数 {len(works)} < {args.min_works}，目录解析失败"
+                         f"（单篇/小批文献请用 --single，或调低 --min-works）")
+    print(f"[OK] 篇目数 {len(works)} ≥ {args.min_works if args.single is None else 1}")
 
 
 if __name__ == "__main__":

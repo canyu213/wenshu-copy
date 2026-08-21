@@ -78,7 +78,7 @@ wenshu/
 ├── docs/对接指南.md             ← AI 接入必读
 ├── workflows/                  ← 6 个工作流
 ├── references/                 ← 6 份规范
-├── scripts/                    ← 确定性工具（format_reference.py / anchor_injector.py / skill_rag.py）
+├── scripts/                    ← 确定性工具（format_reference.py / anchor_injector.py / skill_rag.py / pdf_extract.py / toc_parse.py / epub_split.py）
 └── README.md                   ← 项目说明
 ```
 
