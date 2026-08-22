@@ -75,7 +75,7 @@ wenshu/
 
 - **LLM**：API 链接模型（DeepSeek / 硅基流动 / OpenAI 兼容）
 - **检索/图谱**：skill_rag.py（文枢自研模式 D：embedding API + numpy 本地余弦 + 图谱增强；LightRAG 为对照参考）
-- **格式化**：format_reference.py（MIT 复用）
+- **格式化**：format_reference.py（复用 chinese-reference-formatter-skill，Zechang-Xiong，MIT，见 scripts/LICENSE-format_reference.txt）
 - **段落标注**：anchor_injector.py（文枢自研：段落切分 + Block ID 注入 + 校验）
 - **检索问答**：skill_rag.py（向量索引 + 谱系图谱 + 锚点溯源问答）
 - **数据源**：Zotero / Obsidian
