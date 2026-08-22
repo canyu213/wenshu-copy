@@ -1,21 +1,22 @@
 ---
 name: wenshu
+skill_identifier: wenshu-knowledge-base
+version: "1.0.0"
 description: 文枢——面向人文社科研究的 AI 知识处理工作流。Use when the user needs 文献导入、段落标注、引文格式化、谱系图谱、论证链等人文社科知识处理能力。运行于 CodeBuddy / WorkBuddy 等国产 agent 工具。
 license: MIT
 metadata:
   author: ekstasisSH
-  version: "0.1.0"
   repository: https://github.com/ekstasisSH/wenshu
   tags: humanities, knowledge-base, citation, rag, academic-writing
 ---
 
 # 文枢 · 人文社科知识处理工作流
 
-## Overview
+## 简介
 
-文枢把"整理文献、查资料、引文格式、梳理理论脉络"这些科研苦力活，做成一包能直接运行在 agent 工具（CodeBuddy / WorkBuddy）里的工作流。输入文献与需求，输出可溯源的知识处理结果。
+文枢是一组跑在 agent 工具（CodeBuddy / WorkBuddy）里的工作流，干的是人文社科研究里最费时间的活：整理文献、查资料、排引文格式、梳理理论脉络。丢一批文献进去，得到的结果带出处、可核查。
 
-**核心承诺**：让 AI 替你打工，让人文社科生早点收工。**核心底线**：AI 辅助非代写，引文可溯源，不编造。
+AI 只做检索、润色、排版这类机械活。研究假设、核心论点、结论由研究者自己定。引用必须能回溯到原文，查不到就标"待查"，不编造。
 
 ## 能力清单
 
@@ -63,7 +64,7 @@ metadata:
 - **检索问答**：skill_rag.py（向量索引 + 谱系图谱 + 锚点溯源问答）
 - **数据源**：Zotero（文献管理）/ Obsidian（笔记）
 
-## 合规红线（不可妥协）
+## 合规红线
 
 1. **AI 辅助非代写**：AI 做检索、润色、格式、初稿框架；不代写研究假设、核心论点、结论
 2. **引文可溯源**：所有引用必须核验 + 可回溯原文；无页码标"待查"，禁止编造
@@ -84,5 +85,6 @@ wenshu/
 
 ## 版本记录
 
-- v0.1.0（2026-08-16）：references/ + workflows/ 产出，skill 骨架搭建
+- v1.0.0（2026-08-22）：功能完整首发——六段流水线（提取→目录解析→偏移检测→分篇切分→知识库→质量门）、EPUB 支持、单篇自动路径、双实证（毛选 1559 页 + 3 篇异构文献全绿）、开源双仓、SkillHub 公开发布
 - v0.1.1（2026-08-19）：自研 skill_rag.py 转正（LightRAG 降为对照参考）；slogan 更新；毛选全量复现与 galaxy 演示上线
+- v0.1.0（2026-08-16）：references/ + workflows/ 产出，skill 骨架搭建
