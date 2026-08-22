@@ -22,14 +22,14 @@ import re
 
 # 目录行：纯"目录" 或 "目 录 N"（带页码）
 DIRECTORY_RE = re.compile(r"^(目\s*录|目录)(?:\s*\d{1,3})?\s*$")
-PERIOD_RE = re.compile(r"(第[一二三四五]次国内革命战争时期|抗日战争时期|解放战争时期|社会主义革命和建设时期)")
+PERIOD_RE = re.compile(r"([一-龥]{2,12}(?:战争|革命|建设)时期)")
 VOL_RE = re.compile(r"第[一二三四五]卷")
 
 # 篇目行：篇名（年份）…… 页码范围；容忍 OCR 空格
 PAGE_RANGE_RE = re.compile(r"(\d[\d ]*)\s*(?:—|–|-)\s*(\d{1,4})\s*$")
 
-# 页眉：页码 + 毛泽东选[集/栠/粲] + 时期/卷
-HEADER_RE = re.compile(r"^\d+\s*毛泽东选[集栠粲桀]*\s*(?:第[一二三四五]\s*卷)?[^\n]*$")
+# 页眉：页码 + 书名选集 + 时期/卷
+HEADER_RE = re.compile(r"^\d+\s*[^\s\n]{1,12}选[集栠粲桀]*\s*(?:第[一二三四五]\s*卷)?[^\n]*$")
 
 
 def norm_num(s: str) -> int:
@@ -43,7 +43,7 @@ def is_toc_page(text: str) -> bool:
         return False
     if DIRECTORY_RE.match(lines[0]):
         return True
-    # 页首含"毛泽东选X第X卷"（目录页眉）+ 页内有页码范围行
+    # 页首含"书名选集X第X卷"（目录页眉）+ 页内有页码范围行
     if len(lines) > 2 and re.search(r"目录", lines[0]):
         return True
     return False
@@ -144,7 +144,7 @@ def scan_body_titles(pages: dict, toc_ranges: list[dict]) -> list[dict]:
             continue
         title = lines[1]
         # 标题特征：中文开头、3-35字、不以句号/问号/点号结尾、非页眉
-        if not title or "毛泽东选" in title:
+        if not title or "选集" in title or "全集" in title:
             continue
         if re.search(r"[。！？；．，、]$", title):
             continue

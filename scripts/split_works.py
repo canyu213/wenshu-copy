@@ -40,11 +40,11 @@ def detect_headers(pages: dict, min_ratio: float = 0.3, min_count: int = 2) -> s
     return {line for line, c in counts.items() if c >= threshold}
 
 
-HEADER_RE = re.compile(r"^\d+\s*毛泽东选[集栠粲桀]*\s*(?:第[一二三四五]\s*卷)?[^\n]*\n")
+HEADER_RE = re.compile(r"^\d+\s*[^\s\n]{1,12}选[集栠粲桀]*\s*(?:第[一二三四五]\s*卷)?[^\n]*\n")
 
 
 def clean_page(text: str, headers: set[str] | None = None) -> str:
-    """清理单页：去页眉（毛选硬编码 + 跨页高频行）、去孤立页码行、保留自然段落。"""
+    """清理单页：去页眉（书名页眉 + 跨页高频行）、去孤立页码行、保留自然段落。"""
     t = text.strip()
     t = HEADER_RE.sub("", t, count=1)
     if headers:

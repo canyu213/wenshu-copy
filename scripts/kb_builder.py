@@ -5,7 +5,7 @@
 每篇一个 .md，含 YAML 元数据 + 页码锚点（^v{卷}p{页码}）+ 页内自然段。
 
 用法：
-    kb_builder.py --split split_works.json --output 知识库目录 [--tags "#毛选,#第1卷"] [--dry-run]
+    kb_builder.py --split split_works.json --output 知识库目录 [--tags "#原典,#第1卷"] [--dry-run]
 """
 import argparse
 import json
@@ -127,7 +127,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="S5 生成 md 知识库")
     ap.add_argument("--split", required=True, help="split_works.json 路径")
     ap.add_argument("--output", required=True, help="知识库输出目录")
-    ap.add_argument("--tags", default="", help="领域标签，逗号分隔，如 '#毛选,#第1卷'")
+    ap.add_argument("--tags", default="", help="领域标签，逗号分隔，如 '#原典,#第1卷'")
     ap.add_argument("--dry-run", action="store_true", help="只统计不写盘")
     args = ap.parse_args()
 
