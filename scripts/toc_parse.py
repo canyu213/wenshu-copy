@@ -31,8 +31,8 @@ PAGE_RANGE_RE = re.compile(r"(\d[\d ]*)\s*(?:—|–|-)\s*(\d{1,4})\s*$")
 SINGLE_PAGE_RE = re.compile(r"(?:/|・|\s)\s*([0-9IVXLivxl]{1,4})\s*$")
 ROMAN = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6,
          "vii": 7, "viii": 8, "ix": 9, "x": 10, "xi": 11, "xii": 12}
-# 教材章标题：导论/绪论/结语/第X章（章名后可带标题文字，也可孤词如"导论"）
-CHAPTER_RE = re.compile(r"^(导论|绪论|结语|第[一二三四五六七八九十百]+章)(?:\s*\S.*)?$")
+# 教材章标题：导言/导论/绪论/结语/第X章（容忍"第 一章"OCR/排版空格；章名后可有标题或孤词"导言"）
+CHAPTER_RE = re.compile(r"^(导言|导论|绪论|结语|前言|第\s*[一二三四五六七八九十百]+\s*章)(?:\s*\S.*)?$")
 TOC_HEADER_RE = re.compile(r"^(目录|目\s*录)(\s*[ivxlIVXL\d]*)?$")
 
 # 页眉：页码 + 书名选集 + 时期/卷
@@ -191,12 +191,14 @@ def scan_body_titles(pages: dict, toc_ranges: list[dict]) -> list[dict]:
         if not re.fullmatch(r"\d{1,4}", lines[0]):
             continue
         title = lines[1]
-        # 标题特征：中文开头、3-35字、不以句号/问号/点号结尾、非页眉
+        # 标题特征：中文开头、3-35字、不以句号/问号/点号结尾、非页眉、不含句中标点（防正文句误扫）
         if not title or "选集" in title or "全集" in title:
             continue
-        if re.search(r"[。！？；．，、]$", title):
+        if re.search(r"[。！？；．，、：]$", title):
             continue
         if not re.match(r"^[\u4e00-\u9fff《》]", title):
+            continue
+        if re.search(r"[，、；：]", title):  # 正文句含逗号/顿号 → 非标题
             continue
         if not (3 <= len(title) <= 35):
             continue
@@ -233,6 +235,12 @@ def merge(toc_entries: list[dict], body_hits: list[dict],
         if book_start is None:
             key = re.sub(r"[\s/]+", "", title)
             cands = a_by_title.get(key, [])
+            if not cands:
+                # 前缀匹配：B 为跨行截断标题，A 完整标题以 B 开头
+                for a_key, a_cands in a_by_title.items():
+                    if a_key.startswith(key):
+                        cands = a_cands
+                        break
             if cands:
                 match = cands[0]
         else:
@@ -245,6 +253,11 @@ def merge(toc_entries: list[dict], body_hits: list[dict],
                     break
         if match:
             used_a.add(id(match))
+            # 跨行截断标题补全：B 标题是 A 标题真前缀（去空白后）→ 用 A 完整标题
+            a_t = re.sub(r"[\s/]+", "", match["title"])
+            b_t = re.sub(r"[\s/]+", "", title)
+            if a_t.startswith(b_t) and len(a_t) > len(b_t):
+                title = match["title"]
             works.append({
                 "title": title,
                 "volume": match["volume"],
