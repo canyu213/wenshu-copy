@@ -27,6 +27,13 @@ VOL_RE = re.compile(r"第[一二三四五]卷")
 
 # 篇目行：篇名（年份）…… 页码范围；容忍 OCR 空格
 PAGE_RANGE_RE = re.compile(r"(\d[\d ]*)\s*(?:—|–|-)\s*(\d{1,4})\s*$")
+# 教材/单页码目录：标题/ 25 或 标题 25（尾部单阿拉伯或罗马数字）
+SINGLE_PAGE_RE = re.compile(r"(?:/|・|\s)\s*([0-9IVXLivxl]{1,4})\s*$")
+ROMAN = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6,
+         "vii": 7, "viii": 8, "ix": 9, "x": 10, "xi": 11, "xii": 12}
+# 教材章标题：导论/绪论/结语/第X章（章名后可带标题文字，也可孤词如"导论"）
+CHAPTER_RE = re.compile(r"^(导论|绪论|结语|第[一二三四五六七八九十百]+章)(?:\s*\S.*)?$")
+TOC_HEADER_RE = re.compile(r"^(目录|目\s*录)(\s*[ivxlIVXL\d]*)?$")
 
 # 页眉：页码 + 书名选集 + 时期/卷
 HEADER_RE = re.compile(r"^\d+\s*[^\s\n]{1,12}选[集栠粲桀]*\s*(?:第[一二三四五]\s*卷)?[^\n]*$")
@@ -95,22 +102,50 @@ def detect_volume(pages: dict, toc_start: int) -> str:
 # ========== 通道 A：目录页解析 ==========
 
 def parse_toc_page(text: str, volume: str) -> list[dict]:
-    """解析单个目录页 → 篇目条目 [{title, book_start, book_end}]。"""
+    """解析单个目录页 → 篇目条目 [{title, book_start, book_end}]。
+    支持两种格式：毛选式范围页码（标题…25—26）与教材式单页码（标题/ 25 或 导论/I）。"""
     entries = []
     lines = [l.strip() for l in text.split("\n") if l.strip()]
     for line in lines:
+        # 跳过目录页页眉（"目录"/"iii 目录"/"目录 iv"）
+        if TOC_HEADER_RE.match(line):
+            continue
         m = PAGE_RANGE_RE.search(line)
-        if not m:
+        if m:
+            start, end = norm_num(m.group(1)), int(m.group(2))
+            if end < start or end - start > 400:
+                continue
+            title = clean_toc_title(line)
+            if len(title) < 3:
+                continue
+            entries.append({"title": title, "book_start": start, "book_end": end,
+                            "volume": volume})
             continue
-        start, end = norm_num(m.group(1)), int(m.group(2))
-        if end < start or end - start > 400:
-            continue
-        title = clean_toc_title(line)
-        if len(title) < 3:
-            continue
-        entries.append({"title": title, "book_start": start, "book_end": end,
-                        "volume": volume})
+        # 教材式单页码（数字或罗马数字）
+        m2 = SINGLE_PAGE_RE.search(line)
+        if m2:
+            pg = m2.group(1)
+            if pg.isdigit():
+                start = int(pg)
+            elif pg.lower() in ROMAN:
+                start = ROMAN[pg.lower()]
+            else:
+                continue
+            title = clean_toc_title_single(line, pg)
+            # 残行过滤：按汉字计数（"导论"2 汉字通过，"一、"1 汉字过滤）
+            if len(re.findall(r"[\u4e00-\u9fff]", title)) < 2:
+                continue
+            entries.append({"title": title, "book_start": start, "book_end": None,
+                            "volume": volume})
     return entries
+
+
+def clean_toc_title_single(line: str, pg: str) -> str:
+    """教材目录行清理：去尾部' / 页码'、去省略号、压缩 OCR 空格。"""
+    t = re.sub(r"(?:/|・|\s)+\s*" + re.escape(pg) + r"\s*$", "", line)
+    t = re.sub(r"[…．．．·…]+.*$", "", t)
+    t = re.sub(r"(?<=[\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])", "", t)
+    return t.strip()
 
 
 def clean_toc_title(line: str) -> str:
@@ -140,6 +175,19 @@ def scan_body_titles(pages: dict, toc_ranges: list[dict]) -> list[dict]:
         lines = [l.strip() for l in text.split("\n") if l.strip()]
         if len(lines) < 2:
             continue
+        # 教材模式：页首为章标题（导论/第X章 等），无需孤立页码行
+        first = lines[0]
+        if CHAPTER_RE.match(first):
+            # 页眉过滤：'导论 3' / '导论 S'（章名+书内页码，OCR 噪声）
+            if re.search(r"\s[\dSIVXLivxl]{1,3}$", first):
+                continue
+            if (not (2 <= len(first) <= 35)
+                    or re.search(r"[。！？；．，、]$", first)
+                    or "选集" in first or "全集" in first):
+                continue
+            hits.append({"title": first, "pdf_page": pg, "book_page": None})
+            continue
+        # 原毛选模式：孤立页码行 + 下一行短中文标题
         if not re.fullmatch(r"\d{1,4}", lines[0]):
             continue
         title = lines[1]
@@ -169,20 +217,32 @@ def merge(toc_entries: list[dict], body_hits: list[dict],
     a_by_start = {}
     for e in toc_entries:
         a_by_start.setdefault(e["book_start"], []).append(e)
+    # 通道 A 标题索引（教材场景：B 只给 pdf_page，靠标题匹配 A 的书内页码）
+    a_by_title = {}
+    for e in toc_entries:
+        key = re.sub(r"[\s/]+", "", e["title"])
+        a_by_title.setdefault(key, []).append(e)
 
     works = []
     used_a = set()
     for h in body_hits:
         title = re.sub(r"[．。，、＊*]+$", "", h["title"]).strip()
         book_start = h["book_page"]
-        # 匹配 A 的页码范围（起始页精确或 ±2 内）
+        # 教材场景：B 无书内页码 → 标题精确匹配 A（去空白）
         match = None
-        for delta in range(0, 3):
-            for e in a_by_start.get(book_start + delta, []):
-                match = e
-                break
-            if match:
-                break
+        if book_start is None:
+            key = re.sub(r"[\s/]+", "", title)
+            cands = a_by_title.get(key, [])
+            if cands:
+                match = cands[0]
+        else:
+            # 原毛选场景：按起始页匹配（精确或 ±2 内）
+            for delta in range(0, 3):
+                for e in a_by_start.get(book_start + delta, []):
+                    match = e
+                    break
+                if match:
+                    break
         if match:
             used_a.add(id(match))
             works.append({
