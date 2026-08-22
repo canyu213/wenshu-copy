@@ -1,3 +1,8 @@
 work_毛选/
 work_实证/
 __pycache__/
+scripts/.env
+kb_*/
+work_*/
+__pycache__/
+*.pyc
