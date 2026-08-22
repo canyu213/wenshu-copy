@@ -50,17 +50,19 @@ pages = {
     "page_0014.txt": "导言\n中国近现代史，是指1840年……",  # 纲要：导言
     "page_0026.txt": "第 一章 进入近代后中华民族的磨难与抗争\n在西方国家工业革命发生前……",  # 纲要：空格章标题
     "page_0019.txt": "6\n争、解放战争，以武装的革命反对武装的反革命，推翻帝国主义……",  # 正文句误扫场景
+    "page_0108.txt": "第四章社会主义建设道路初步探索的理论成果96\n中国……",  # 毛概论：紧贴页码标题页
 }
 hits = toc_parse.scan_body_titles(pages, [{"start": 5, "end": 8, "volume": ""}])
 by_pdf = {h["pdf_page"]: h for h in hits}
 check("第一章扫描", by_pdf.get(35, {}).get("title", "").startswith("第一章"))
 check("孤词 导论 扫描", by_pdf.get(9, {}).get("title") == "导论")
-check("页眉 导论 3 过滤", 11 not in by_pdf)
-check("页眉 导论 S 过滤", 13 not in by_pdf)
+check("页眉 导论 3 清洗去页码", by_pdf.get(11, {}).get("title") == "导论")
+check("页眉 导论 S 清洗去页码", by_pdf.get(13, {}).get("title") == "导论")
 check("毛选孤立页码不回归", by_pdf.get(100, {}).get("title") == "实践论")
 check("纲要 导言 扫描", by_pdf.get(14, {}).get("title") == "导言")
 check("纲要 空格章标题 扫描", re.sub(r"\s", "", by_pdf.get(26, {}).get("title", "")).startswith("第一章"))
 check("正文句含逗号 过滤", 19 not in by_pdf)
+check("紧贴页码标题清洗", by_pdf.get(108, {}).get("title") == "第四章社会主义建设道路初步探索的理论成果")
 
 print("=== 合并 merge ===")
 # 教材：B 无书内页码 → 标题匹配 A
@@ -78,6 +80,18 @@ res = toc_parse.merge(
     [{"title": "第 九章 改革开放与中国特色社会主义的", "pdf_page": 255, "book_page": None}])
 w = res["works"][0]
 check("截断标题前缀补全", w["title"] == "第九章改革开放与中国特色社会主义的开创和发展" and w["book_start"] == 242)
+# 页眉重复去重：同标题两条 → 保留最早 pdf
+res = toc_parse.merge(
+    [{"title": "导论", "book_start": 1, "book_end": None, "volume": ""}],
+    [{"title": "导论", "pdf_page": 9, "book_page": None},
+     {"title": "导论", "pdf_page": 11, "book_page": None}])
+check("页眉重复去重保留最早页", len(res["works"]) == 1 and res["works"][0]["pdf_start"] == 9)
+# OCR 变体模糊匹配：毛泽东思血 → 毛泽东思想
+res = toc_parse.merge(
+    [{"title": "第一章毛泽东思想及其历史地位", "book_start": 15, "book_end": None, "volume": ""}],
+    [{"title": "第一章：毛泽东思血及兵方史地位", "pdf_page": 30, "book_page": None}])
+w = res["works"][0]
+check("OCR变体模糊匹配", w["title"] == "第一章毛泽东思想及其历史地位" and w["book_start"] == 15)
 # 毛选：按页码匹配
 res = toc_parse.merge([{"title": "实践论", "book_start": 25, "book_end": 26, "volume": ""}],
                       [{"title": "实践论", "pdf_page": 100, "book_page": 25}])

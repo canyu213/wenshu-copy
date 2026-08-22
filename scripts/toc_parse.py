@@ -110,6 +110,10 @@ def parse_toc_page(text: str, volume: str) -> list[dict]:
         # 跳过目录页页眉（"目录"/"iii 目录"/"目录 iv"）
         if TOC_HEADER_RE.match(line):
             continue
+        # 目录行尾错位章号（OCR："邓小平理论/ 150第六章"）→ 前移为"第六章邓小平理论/ 150"
+        m_ch = re.search(r"(第[一二三四五六七八九十百]+章)\s*$", line)
+        if m_ch and not re.match(r"^(导言|导论|绪论|结语|前言|第\s*[一二三四五六七八九十百]+\s*章)", line):
+            line = m_ch.group(1) + line[:m_ch.start()].rstrip()
         m = PAGE_RANGE_RE.search(line)
         if m:
             start, end = norm_num(m.group(1)), int(m.group(2))
@@ -175,17 +179,16 @@ def scan_body_titles(pages: dict, toc_ranges: list[dict]) -> list[dict]:
         lines = [l.strip() for l in text.split("\n") if l.strip()]
         if len(lines) < 2:
             continue
-        # 教材模式：页首为章标题（导论/第X章 等），无需孤立页码行
+        # 教材模式：页首为章标题（导言/第X章 等），无需孤立页码行。
+        # 标题可带紧贴页码（页眉样式，如"第四章…成果96"）——清洗去页码，merge 去重保留最早页。
         first = lines[0]
         if CHAPTER_RE.match(first):
-            # 页眉过滤：'导论 3' / '导论 S'（章名+书内页码，OCR 噪声）
-            if re.search(r"\s[\dSIVXLivxl]{1,3}$", first):
+            title = re.sub(r"[\dSIVXLivxl]{1,4}$", "", first).strip()
+            if (not (2 <= len(title) <= 35)
+                    or re.search(r"[。！？；．，、]$", title)
+                    or "选集" in title or "全集" in title):
                 continue
-            if (not (2 <= len(first) <= 35)
-                    or re.search(r"[。！？；．，、]$", first)
-                    or "选集" in first or "全集" in first):
-                continue
-            hits.append({"title": first, "pdf_page": pg, "book_page": None})
+            hits.append({"title": title, "pdf_page": pg, "book_page": None})
             continue
         # 原毛选模式：孤立页码行 + 下一行短中文标题
         if not re.fullmatch(r"\d{1,4}", lines[0]):
@@ -230,7 +233,8 @@ def merge(toc_entries: list[dict], body_hits: list[dict],
     for h in body_hits:
         title = re.sub(r"[．。，、＊*]+$", "", h["title"]).strip()
         book_start = h["book_page"]
-        # 教材场景：B 无书内页码 → 标题精确匹配 A（去空白）
+        fuzzy_hit = False
+        # 教材场景：B 无书内页码 → 标题匹配 A（精确→前缀→模糊）
         match = None
         if book_start is None:
             key = re.sub(r"[\s/]+", "", title)
@@ -241,6 +245,17 @@ def merge(toc_entries: list[dict], body_hits: list[dict],
                     if a_key.startswith(key):
                         cands = a_cands
                         break
+            if not cands:
+                # 模糊匹配：OCR 变体标题（如"毛泽东思血"→"毛泽东思想"），同前缀内相似度>0.6
+                import difflib
+                best, best_r = None, 0.6
+                for a_key, a_cands in a_by_title.items():
+                    r = difflib.SequenceMatcher(None, a_key, key).ratio()
+                    if a_key[:2] == key[:2] and r > best_r:
+                        best, best_r = a_cands, r
+                if best:
+                    cands = best
+                    fuzzy_hit = True
             if cands:
                 match = cands[0]
         else:
@@ -253,10 +268,10 @@ def merge(toc_entries: list[dict], body_hits: list[dict],
                     break
         if match:
             used_a.add(id(match))
-            # 跨行截断标题补全：B 标题是 A 标题真前缀（去空白后）→ 用 A 完整标题
+            # 标题补全：B 截断（B 是 A 前缀）或 OCR 变体（模糊命中）→ 用 A 完整标题
             a_t = re.sub(r"[\s/]+", "", match["title"])
             b_t = re.sub(r"[\s/]+", "", title)
-            if a_t.startswith(b_t) and len(a_t) > len(b_t):
+            if (a_t.startswith(b_t) and len(a_t) > len(b_t)) or fuzzy_hit:
                 title = match["title"]
             works.append({
                 "title": title,
@@ -292,11 +307,11 @@ def merge(toc_entries: list[dict], body_hits: list[dict],
         w["volume"] = vol
 
     works.sort(key=lambda x: (x.get("book_start") or 0))
-    # 去重（同 title 保留范围更全的）
+    # 去重：同标题（去空白）保留 pdf_start 最早（教材页眉重复场景：章标题每页出现）
     seen = {}
     for w in works:
-        key = w["title"]
-        if key not in seen or (w["book_end"] and not seen[key].get("book_end")):
+        key = re.sub(r"[\s/]+", "", w["title"])
+        if key not in seen or w.get("pdf_start", 99999) < seen[key].get("pdf_start", 99999):
             seen[key] = w
     works = list(seen.values())
     works.sort(key=lambda x: (x.get("book_start") or 0))
