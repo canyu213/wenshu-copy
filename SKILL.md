@@ -1,6 +1,6 @@
 ---
 name: wenshu
-version: "1.1.1"
+version: "1.1.2"
 description: 文枢——面向人文社科研究的 AI 知识处理工作流。Use when the user needs 文献导入、段落标注、引文格式化、谱系图谱、论证链等人文社科知识处理能力。运行于 CodeBuddy / WorkBuddy 等国产 agent 工具。
 license: MIT
 metadata:
@@ -36,6 +36,7 @@ AI 只做检索、润色、排版这类机械活。研究假设、核心论点�
 谱系图谱：把来源、发展、争论关系组织成可检索的图谱。
 论证链：用图尔敏模型标注论点与证据链。
 检索问答：向量召回加图谱增强，回答带锚点出处。
+链接注入：按关键词映射表，给文献注入相关链接。
 
 流程一览
 
@@ -67,6 +68,7 @@ LLM：API 链接模型（DeepSeek、硅基流动等 OpenAI 兼容），智能体
 反链维护：cited_by_backfill.py，遍历相关经典字段，回填 cited_by 反向索引。
 知识库巡检：kb_health.py（yaml/tags/links 三查）+ snapshot_diff.py（快照差异）。
 DOCX 提取：docx_extract.py，正文加基础元数据（标题/日期/公文号），依赖 python-docx。
+链接注入：link_inject.py，关键词映射表驱动（--map JSON），注入相关链接。
 输入：本地 PDF、EPUB、DOCX 文件（单篇或整本专著），由使用者提供文件路径，入库后生成可检索知识库。
 
 合规红线
@@ -80,6 +82,7 @@ AI 辅助非代写：AI 做检索、润色、格式、初稿框架，不代写�
 
 版本记录
 
+v1.1.2（2026-08-22）：链接注入转正——link_inject.py（合并 semantic_match_links + upgrade_inject_links 机制，关键词映射表 --map 参数化，13 用例测试），入库规范 §5 落地
 v1.1.1（2026-08-22）：DOCX 入库转正——docx_extract.py（从 unified_import 抽取，正文+基础元数据，删个人库路由/标签业务，14 用例测试），SKILL.md 能力恢复 DOCX
 v1.1.0（2026-08-22）：知识库巡检转正——kb_health.py（YAML 闭合/标签合规/死链检测三查合并，--kb/--dir/--forbidden 参数化）+ snapshot_diff.py（快照差异，--log 写变更日志），入库规范 §6 质量门落地
 v1.0.9（2026-08-22）：反链脚本转正——cited_by_backfill.py（个人库实战通用化，--kb 参数化、去重修复、13 用例测试），合规红线"反链由脚本维护"落地

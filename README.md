@@ -92,6 +92,7 @@ wenshu/
 - **反链维护**：cited_by_backfill.py（遍历 related_* 回填 cited_by 反向索引）
 - **知识库巡检**：kb_health.py（yaml/tags/links 三查）+ snapshot_diff.py（快照差异）
 - **DOCX 提取**：docx_extract.py（正文 + 基础元数据，依赖 python-docx）
+- **链接注入**：link_inject.py（关键词映射表 --map 驱动，注入相关链接）
 - **输入**：本地 PDF/EPUB/DOCX（单篇或整本专著），入库生成可检索知识库
 
 ## 交互演示
@@ -115,6 +116,8 @@ AI 辅助非代写；引文可溯源、不编造；遵守学术诚信。
 MIT
 
 ## 版本
+
+v1.1.2（2026-08-22）：链接注入转正——link_inject.py（映射表驱动，合并 semantic_match_links/upgrade_inject_links）
 
 v1.1.1（2026-08-22）：DOCX 入库转正——docx_extract.py（正文+基础元数据，删个人库路由/标签业务）
 
