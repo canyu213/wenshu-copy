@@ -1,6 +1,6 @@
 {
   "id": "wenshu-knowledge-base",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description_use": "需要人文社科知识处理，包括文献导入、段落标注、引文格式化、谱系图谱、论证链、知识库检索问答等",
   "description_dont": "需要论文写作辅助（大纲设计/润色/查重）、通用对话聊天",
   "allowed_tools": ["Read", "Write", "Bash", "Glob", "Grep", "Agent", "WebSearch", "AskUserQuestion"],

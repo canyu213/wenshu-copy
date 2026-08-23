@@ -1,6 +1,6 @@
 ---
 name: wenshu
-version: "1.0.3"
+version: "1.0.4"
 description: 文枢——面向人文社科研究的 AI 知识处理工作流。Use when the user needs 文献导入、段落标注、引文格式化、谱系图谱、论证链等人文社科知识处理能力。运行于 CodeBuddy / WorkBuddy 等国产 agent 工具。
 license: MIT
 metadata:
@@ -12,9 +12,9 @@ metadata:
 
 ## 阅读指南
 
-- 使用者读：简介 / 名字由来 / 能力清单 / 工作流速览 / 技术底座 / 版本记录
-- 智能体执行：入口路由 / API 配置 / 规范引用 / 完成提示 / 执行质检清单 / 文档导航
-- 两边共用：边界 / 合规红线 / 快速开始
+以下内容供使用者阅读。
+
+智能体执行规范见 `workflows/执行规范.md`（入口路由 / API 配置 / 规范引用 / 完成提示 / 质检清单）。
 
 ## 简介
 
@@ -59,50 +59,13 @@ AI 只做检索、润色、排版这类机械活。研究假设、核心论点�
 | 论证链 | 图尔敏模型标注论点-证据链 | 结构化论证链 |
 | 检索问答 | 向量召回 + 图谱增强 + 锚点溯源 | 带出处的问答结果 |
 
-## 入口路由（智能体）
-
-按用户的使用场景路由，不按功能名。
-
-### 优先 AskUserQuestion 询问
-
-> 📚 文枢已就绪
-> 请问您现在需要什么？
->
-> A) 我有一批文献/一本书要整理入库
-> B) 我想在知识库里查资料、问问题
-> C) 我想理清一个概念的来龙去脉
-> D) 我要格式化或核验参考文献
-> E) 我要组织论点与证据链
-
-### 无 AskUserQuestion 时按触发词路由
-
-| 用户意图 | 路由 |
-|---|---|
-| 入库/整理/导入文献 | `workflows/文献导入.md` |
-| 查资料/问答/知识库里 | `workflows/检索问答.md` |
-| 概念/脉络/来龙去脉 | `workflows/谱系图谱.md` |
-| 引文/参考文献/引用格式 | `workflows/引文格式化.md` |
-| 论点/论证/证据 | `workflows/论证链.md` |
-
-（入库时自动执行段落标注，无需单独触发）
-
 ## 快速开始（使用者）
 
 装好就能用。向智能体说一句：
 
 "帮我把这篇文献入库" / "格式化这个引文" / "梳理某某概念的谱系"
 
-入库、引文格式化、段落标注不需要 API key。检索问答和入库摘要需要（见「API 配置」）。
-
-## 快速开始（智能体）
-
-1. 收到触发 → 按「入口路由」分发到工作流
-2. 入库/检索前，检查 scripts/.env 是否已配置（见「API 配置」）
-3. 产物写入 kb_*/work_*，由脚本生成，不手改
-
-## API 配置（智能体）
-
-### 影响矩阵：不配置会怎样（使用者读）
+入库、引文格式化、段落标注不需要 API key。检索问答和入库摘要需要，不配置的影响：
 
 | 功能 | 需要 key？ | 不配置的表现 |
 |---|---|---|
@@ -111,52 +74,7 @@ AI 只做检索、润色、排版这类机械活。研究假设、核心论点�
 | 检索问答（向量召回 + 图谱增强） | Embedding | 不可用 |
 | 入库摘要（实体/关系） | LLM | 跳过摘要，锚点与检索不受影响 |
 
-先用不需要 key 的功能，确认价值后再配置升级。
-
-### 配置动作（智能体执行）
-
-使用者说"帮我配置"或在对话中给出 key 时，按序执行：
-
-1. 检查 scripts/.env：缺失或 key 无效 → 进入配置流程；已配置 → 跳过
-2. 收集 key：DeepSeek（LLM_BINDING_API_KEY）+ 硅基流动（EMBEDDING / RERANK_BINDING_API_KEY）
-3. 写入 scripts/.env（无则创建，模板见下）
-4. 验证：HTTP 探测 DeepSeek /models 与硅基流动 /user/info，返回 200 即有效；无效则提示重新提供
-5. 报告：只报 key 指纹（尾 6 位），不复述完整 key
-
-`.env` 变量模板：
-
-```
-LLM_BINDING=openai
-LLM_BINDING_HOST=https://api.deepseek.com/v1
-LLM_BINDING_API_KEY=<DeepSeek key>
-LLM_MODEL=deepseek-chat
-EMBEDDING_BINDING=openai
-EMBEDDING_BINDING_HOST=https://api.siliconflow.cn/v1
-EMBEDDING_BINDING_API_KEY=<硅基流动 key>
-EMBEDDING_MODEL=BAAI/bge-m3
-EMBEDDING_DIM=1024
-RERANK_BINDING=cohere
-RERANK_MODEL=BAAI/bge-reranker-v2-m3
-RERANK_BINDING_HOST=https://api.siliconflow.cn/v1/rerank
-RERANK_BINDING_API_KEY=<硅基流动 key>
-RERANK_BY_DEFAULT=True
-```
-
-安全：key 仅存本地 `scripts/.env`，不随仓库与平台包分发；配置过程中 key 会出现在对话记录，
-建议配置完成后不分享对话；也可跳过对话，手动编辑 `scripts/.env`。
-
-## 规范引用（智能体）
-
-执行任何工作流前，读取对应 references/ 规范：
-
-| 规范 | 文件 | 适用工作流 |
-|---|---|---|
-| 元数据方案 | `references/元数据方案.md` | 全部 |
-| 知识组织规范 | `references/知识组织规范.md` | 文献导入、谱系图谱 |
-| 段落锚点规范 | `references/段落锚点规范.md` | 段落标注、引文格式化 |
-| 引文规范 | `references/引文规范.md` | 引文格式化 |
-| 入库规范 | `references/入库规范.md` | 文献导入 |
-| 领域适配指南 | `references/领域适配指南.md` | 新领域库搭建 |
+先用不需要 key 的功能，确认价值后再配置升级（配置动作由智能体执行，见 `workflows/执行规范.md`）。
 
 ## 技术底座
 
@@ -179,44 +97,15 @@ RERANK_BY_DEFAULT=True
 ```
 wenshu/
 ├── SKILL.md                    ← 本文件（入口）
-├── workflows/                  ← 6 个工作流
+├── workflows/                  ← 6 个工作流 + 执行规范（智能体总纲）
 ├── references/                 ← 6 份规范
 ├── scripts/                    ← 确定性工具（format_reference.py / anchor_injector.py / skill_rag.py / pdf_extract.py / toc_parse.py / epub_split.py）
 └── README.md                   ← 项目说明
 ```
 
-## 文档导航（智能体）
-
-- `workflows/`：执行具体任务时读取对应工作流
-- `references/`：执行前读取规范（元数据/锚点/引文/入库/领域适配）
-- `scripts/`：确定性工具，由工作流调用，排障时可手动运行
-
-## 完成提示（智能体）
-
-每个工作流执行完毕后，输出：
-
-> ✅ 文枢完成！
->
-> 本次做了什么：[动态摘要]
->
-> 产物位置：[路径]
->
-> 建议下一步：
-> 1. [推荐 1]
-> 2. [推荐 2]
-> 3. [推荐 3]
-
-## 执行质检清单（智能体）
-
-- [ ] 需求已定位到对应工作流
-- [ ] 产物已写入明确路径
-- [ ] 引用带出处，可回原文核对
-- [ ] 查不到的内容已标"待查"，未编造
-- [ ] `cited_by` 等反链由脚本维护，未手改
-- [ ] 已给出下一步建议
-
 ## 版本记录
 
+- v1.0.4（2026-08-22）：SKILL.md 人读化架构——智能体执行指令下放 workflows/执行规范.md，平台介绍页仅呈现人读部分（简介/能力/影响矩阵），执行能力不变
 - v1.0.3（2026-08-22）：文档读者分层重构——阅读指南 + 人读区去 AI 痕迹（简介/名字由来）+ 智能体执行区效率化（标题标注/命令式指令）+ 配置影响矩阵（不配 key 的可用性边界）
 - v1.0.2（2026-08-22）：toc_parse 目录解析增强——教材体例（单页码目录/罗马数字/章标题扫描/页眉过滤/标题匹配合并）、纲要体例（导言前缀/章号容忍/正文句过滤/截断标题补全）、专著适配（OCR 变体归并/去重保留最早页/目录行尾章号前移）、回归测试 24 用例
 - v1.0.1（2026-08-22）：平台适配增强——入口路由场景化（AskUserQuestion + 触发词降级）、工作流速览、快速开始、文档导航、完成提示、执行质检清单、名字由来叙事段
