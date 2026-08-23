@@ -95,6 +95,17 @@ wenshu/
 - **链接注入**：link_inject.py（关键词映射表 --map 驱动，注入相关链接）
 - **输入**：本地 PDF/EPUB/DOCX（单篇或整本专著），入库生成可检索知识库
 
+## 依赖
+
+运行时依赖（按需安装，均为常用库）：
+
+- pypdf：PDF 全文提取（pdf_extract.py）
+- python-docx：DOCX 提取（docx_extract.py）
+- ebooklib：EPUB 拆篇（epub_split.py）
+- numpy：向量余弦检索（skill_rag.py）
+- python-dotenv：.env 配置读取（skill_rag.py / kb_index.py）
+- lightrag（可选）：S7 检索索引备选（kb_index.py；日常问答走 skill_rag.py，不依赖）
+
 ## 交互演示
 
 [concept-galaxy 交互演示](https://ekstasissh.github.io/wenshu-concept-galaxy/)：以《毛泽东选集》第1-4卷（1991年版）为样本，把知识运行时（概念谱系、来源/发展/争论关系）具象化为可交互 3D 模型。
@@ -116,6 +127,8 @@ AI 辅助非代写；引文可溯源、不编造；遵守学术诚信。
 MIT
 
 ## 版本
+
+v1.1.3（2026-08-22）：全面审阅收尾——补 3 个核心脚本测试（format_reference/anchor_injector/split_offset，28 用例）、README 补依赖声明段
 
 v1.1.2（2026-08-22）：链接注入转正——link_inject.py（映射表驱动，合并 semantic_match_links/upgrade_inject_links）
 

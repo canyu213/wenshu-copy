@@ -1,6 +1,6 @@
 ---
 name: wenshu
-version: "1.1.2"
+version: "1.1.3"
 description: 文枢——面向人文社科研究的 AI 知识处理工作流。Use when the user needs 文献导入、段落标注、引文格式化、谱系图谱、论证链等人文社科知识处理能力。运行于 CodeBuddy / WorkBuddy 等国产 agent 工具。
 license: MIT
 metadata:
@@ -82,6 +82,7 @@ AI 辅助非代写：AI 做检索、润色、格式、初稿框架，不代写�
 
 版本记录
 
+v1.1.3（2026-08-22）：全面审阅收尾——补 3 个核心脚本测试（format_reference 12/anchor_injector 9/split_offset 7 用例，测试覆盖 6→9 脚本）、README 补依赖声明段
 v1.1.2（2026-08-22）：链接注入转正——link_inject.py（合并 semantic_match_links + upgrade_inject_links 机制，关键词映射表 --map 参数化，13 用例测试），入库规范 §5 落地
 v1.1.1（2026-08-22）：DOCX 入库转正——docx_extract.py（从 unified_import 抽取，正文+基础元数据，删个人库路由/标签业务，14 用例测试），SKILL.md 能力恢复 DOCX
 v1.1.0（2026-08-22）：知识库巡检转正——kb_health.py（YAML 闭合/标签合规/死链检测三查合并，--kb/--dir/--forbidden 参数化）+ snapshot_diff.py（快照差异，--log 写变更日志），入库规范 §6 质量门落地
