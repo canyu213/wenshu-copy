@@ -89,7 +89,7 @@ wenshu/
 - **格式化**：format_reference.py（复用 chinese-reference-formatter-skill，Zechang-Xiong，MIT，见 scripts/LICENSE-format_reference.txt）
 - **段落标注**：anchor_injector.py（文枢自研：段落切分 + Block ID 注入 + 校验）
 - **检索问答**：skill_rag.py（向量索引 + 谱系图谱 + 锚点溯源问答）
-- **数据源**：Zotero / Obsidian
+- **输入**：本地 PDF/EPUB/DOCX（单篇或整本专著），入库生成可检索知识库
 
 ## 交互演示
 
@@ -112,6 +112,8 @@ AI 辅助非代写；引文可溯源、不编造；遵守学术诚信。
 MIT
 
 ## 版本
+
+v1.0.7（2026-08-22）：表述修正——数据源改为实际输入方式（本地 PDF/EPUB/DOCX），清除 Zotero/Obsidian 误导性表述
 
 v1.0.6（2026-08-22）：平台展示适配——SKILL.md 人读区纯文本化（去 markdown 符号）、人味化重写、简介栏文案备好
 
