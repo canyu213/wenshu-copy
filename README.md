@@ -75,7 +75,7 @@ wenshu/
 
 | 能力 | 说明 |
 |---|---|
-| 文献导入 | PDF/EPUB 入库，全文提取 + 元数据 |
+| 文献导入 | PDF/EPUB/DOCX 入库，全文提取 + 元数据 |
 | 段落标注 | 段落级 Block ID 锚点，支持精准引用与溯源 |
 | 引文格式化 | 核验 + 排版为 GB/T 7714-2025 引文 + BibTeX |
 | 谱系图谱 | 来源/发展/争论关系组织为可检索图谱 |
@@ -91,7 +91,8 @@ wenshu/
 - **检索问答**：skill_rag.py（向量索引 + 谱系图谱 + 锚点溯源问答）
 - **反链维护**：cited_by_backfill.py（遍历 related_* 回填 cited_by 反向索引）
 - **知识库巡检**：kb_health.py（yaml/tags/links 三查）+ snapshot_diff.py（快照差异）
-- **输入**：本地 PDF/EPUB（单篇或整本专著），入库生成可检索知识库
+- **DOCX 提取**：docx_extract.py（正文 + 基础元数据，依赖 python-docx）
+- **输入**：本地 PDF/EPUB/DOCX（单篇或整本专著），入库生成可检索知识库
 
 ## 交互演示
 
@@ -114,6 +115,8 @@ AI 辅助非代写；引文可溯源、不编造；遵守学术诚信。
 MIT
 
 ## 版本
+
+v1.1.1（2026-08-22）：DOCX 入库转正——docx_extract.py（正文+基础元数据，删个人库路由/标签业务）
 
 v1.1.0（2026-08-22）：知识库巡检转正——kb_health.py（YAML/标签/死链三查）+ snapshot_diff.py（快照差异）
 
