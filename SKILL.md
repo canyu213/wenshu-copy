@@ -1,6 +1,6 @@
 ---
 name: wenshu
-version: "1.0.8"
+version: "1.0.9"
 description: 文枢——面向人文社科研究的 AI 知识处理工作流。Use when the user needs 文献导入、段落标注、引文格式化、谱系图谱、论证链等人文社科知识处理能力。运行于 CodeBuddy / WorkBuddy 等国产 agent 工具。
 license: MIT
 metadata:
@@ -64,6 +64,7 @@ LLM：API 链接模型（DeepSeek、硅基流动等 OpenAI 兼容），智能体
 检索与图谱：skill_rag.py，文枢自研模式 D，embedding API 加 numpy 本地余弦加图谱增强。
 格式化：format_reference.py，确定性排版，MIT 复用。
 段落标注：anchor_injector.py，段落切分加 Block ID 注入加校验。
+反链维护：cited_by_backfill.py，遍历相关经典字段，回填 cited_by 反向索引。
 输入：本地 PDF、EPUB 文件（单篇或整本专著），由使用者提供文件路径，入库后生成可检索知识库。
 
 合规红线
@@ -77,6 +78,7 @@ AI 辅助非代写：AI 做检索、润色、格式、初稿框架，不代写�
 
 版本记录
 
+v1.0.9（2026-08-22）：反链脚本转正——cited_by_backfill.py（个人库实战通用化，--kb 参数化、去重修复、13 用例测试），合规红线"反链由脚本维护"落地
 v1.0.8（2026-08-22）：能力表述校准——DOCX/链接注入无 skill 实现，改为实证过的 PDF/EPUB 主链路；入库规范标注 unified_import 为个人库参考、DOCX/TXT/链接注入未内置
 v1.0.7（2026-08-22）：表述修正——数据源改为实际输入方式（本地 PDF/EPUB/DOCX），清除 Zotero/Obsidian 误导性生态表述，标注 Zotero 补全为未内置参考设计
 v1.0.6（2026-08-22）：平台展示适配——SKILL.md 人读区纯文本化（去 markdown 符号），人味化重写，简介栏文案备好

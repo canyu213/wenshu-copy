@@ -89,6 +89,7 @@ wenshu/
 - **格式化**：format_reference.py（复用 chinese-reference-formatter-skill，Zechang-Xiong，MIT，见 scripts/LICENSE-format_reference.txt）
 - **段落标注**：anchor_injector.py（文枢自研：段落切分 + Block ID 注入 + 校验）
 - **检索问答**：skill_rag.py（向量索引 + 谱系图谱 + 锚点溯源问答）
+- **反链维护**：cited_by_backfill.py（遍历 related_* 回填 cited_by 反向索引）
 - **输入**：本地 PDF/EPUB（单篇或整本专著），入库生成可检索知识库
 
 ## 交互演示
@@ -112,6 +113,8 @@ AI 辅助非代写；引文可溯源、不编造；遵守学术诚信。
 MIT
 
 ## 版本
+
+v1.0.9（2026-08-22）：反链脚本转正——cited_by_backfill.py（个人库实战通用化 + 去重修复 + 13 用例）
 
 v1.0.8（2026-08-22）：能力表述校准——DOCX/链接注入无 skill 实现，改为实证过的 PDF/EPUB 主链路
 
