@@ -6,8 +6,8 @@
   "allowed_tools": ["Read", "Write", "Bash", "Glob", "Grep", "Agent", "WebSearch", "AskUserQuestion"],
   "include_dirs": ["workflows", "references", "scripts"],
   "rename_files": { "LICENSE": "LICENSE.txt" },
-  "exclude_dirs": ["docs", "kb_", "work_", ".git", "__pycache__"],
-  "exclude_files": [".env"],
+  "exclude_dirs": ["docs", "kb_", "work_", ".git", "__pycache__", "__tests__"],
+  "exclude_files": [".env", ".gitkeep"],
   "sensitive_words": ["毛选", "毛泽东", "马恩", "列宁", "中特", "新思想", "马克思主义", "社会主义", "共产党", "国内革命", "CodeBuddy", "WorkBuddy", "Cursor", "Claude", "ChatGPT"],
   "url_whitelist": ["api.deepseek.com", "api.siliconflow.cn"],
   "readme": "exclude"

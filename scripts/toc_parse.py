@@ -103,7 +103,7 @@ def detect_volume(pages: dict, toc_start: int) -> str:
 
 def parse_toc_page(text: str, volume: str) -> list[dict]:
     """解析单个目录页 → 篇目条目 [{title, book_start, book_end}]。
-    支持两种格式：毛选式范围页码（标题…25—26）与教材式单页码（标题/ 25 或 导论/I）。"""
+    支持两种格式：专著式范围页码（标题…25—26）与教材式单页码（标题/ 25 或 导论/I）。"""
     entries = []
     lines = [l.strip() for l in text.split("\n") if l.strip()]
     for line in lines:
@@ -190,7 +190,7 @@ def scan_body_titles(pages: dict, toc_ranges: list[dict]) -> list[dict]:
                 continue
             hits.append({"title": title, "pdf_page": pg, "book_page": None})
             continue
-        # 原毛选模式：孤立页码行 + 下一行短中文标题
+        # 原专著模式：孤立页码行 + 下一行短中文标题
         if not re.fullmatch(r"\d{1,4}", lines[0]):
             continue
         title = lines[1]
@@ -246,7 +246,7 @@ def merge(toc_entries: list[dict], body_hits: list[dict],
                         cands = a_cands
                         break
             if not cands:
-                # 模糊匹配：OCR 变体标题（如"毛泽东思血"→"毛泽东思想"），同前缀内相似度>0.6
+                # 模糊匹配：OCR 变体标题（如"哲血"→"哲学"），同前缀内相似度>0.6
                 import difflib
                 best, best_r = None, 0.6
                 for a_key, a_cands in a_by_title.items():
@@ -259,7 +259,7 @@ def merge(toc_entries: list[dict], body_hits: list[dict],
             if cands:
                 match = cands[0]
         else:
-            # 原毛选场景：按起始页匹配（精确或 ±2 内）
+            # 原专著场景：按起始页匹配（精确或 ±2 内）
             for delta in range(0, 3):
                 for e in a_by_start.get(book_start + delta, []):
                     match = e
