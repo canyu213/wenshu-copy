@@ -75,7 +75,7 @@ wenshu/
 
 | 能力 | 说明 |
 |---|---|
-| 文献导入 | PDF/EPUB/DOCX 入库，全文提取 + 元数据 + 链接注入 |
+| 文献导入 | PDF/EPUB 入库，全文提取 + 元数据 |
 | 段落标注 | 段落级 Block ID 锚点，支持精准引用与溯源 |
 | 引文格式化 | 核验 + 排版为 GB/T 7714-2025 引文 + BibTeX |
 | 谱系图谱 | 来源/发展/争论关系组织为可检索图谱 |
@@ -89,7 +89,7 @@ wenshu/
 - **格式化**：format_reference.py（复用 chinese-reference-formatter-skill，Zechang-Xiong，MIT，见 scripts/LICENSE-format_reference.txt）
 - **段落标注**：anchor_injector.py（文枢自研：段落切分 + Block ID 注入 + 校验）
 - **检索问答**：skill_rag.py（向量索引 + 谱系图谱 + 锚点溯源问答）
-- **输入**：本地 PDF/EPUB/DOCX（单篇或整本专著），入库生成可检索知识库
+- **输入**：本地 PDF/EPUB（单篇或整本专著），入库生成可检索知识库
 
 ## 交互演示
 
@@ -112,6 +112,8 @@ AI 辅助非代写；引文可溯源、不编造；遵守学术诚信。
 MIT
 
 ## 版本
+
+v1.0.8（2026-08-22）：能力表述校准——DOCX/链接注入无 skill 实现，改为实证过的 PDF/EPUB 主链路
 
 v1.0.7（2026-08-22）：表述修正——数据源改为实际输入方式（本地 PDF/EPUB/DOCX），清除 Zotero/Obsidian 误导性表述
 

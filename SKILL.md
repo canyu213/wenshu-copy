@@ -1,6 +1,6 @@
 ---
 name: wenshu
-version: "1.0.7"
+version: "1.0.8"
 description: 文枢——面向人文社科研究的 AI 知识处理工作流。Use when the user needs 文献导入、段落标注、引文格式化、谱系图谱、论证链等人文社科知识处理能力。运行于 CodeBuddy / WorkBuddy 等国产 agent 工具。
 license: MIT
 metadata:
@@ -30,7 +30,7 @@ AI 只做检索、润色、排版这类机械活。研究假设、核心论点�
 
 能力
 
-文献导入：PDF、EPUB、DOCX 入库，全文提取、元数据、链接注入。
+文献导入：PDF、EPUB 入库，全文提取、元数据，产出按篇知识库。
 段落标注：段落级 Block ID 锚点，支持精准引用。
 引文格式化：核验后排版为 GB/T 7714-2025 引文，附 BibTeX。
 谱系图谱：把来源、发展、争论关系组织成可检索的图谱。
@@ -64,7 +64,7 @@ LLM：API 链接模型（DeepSeek、硅基流动等 OpenAI 兼容），智能体
 检索与图谱：skill_rag.py，文枢自研模式 D，embedding API 加 numpy 本地余弦加图谱增强。
 格式化：format_reference.py，确定性排版，MIT 复用。
 段落标注：anchor_injector.py，段落切分加 Block ID 注入加校验。
-输入：本地 PDF、EPUB、DOCX 文件（单篇或整本专著），由使用者提供文件路径，入库后生成可检索知识库。
+输入：本地 PDF、EPUB 文件（单篇或整本专著），由使用者提供文件路径，入库后生成可检索知识库。
 
 合规红线
 
@@ -77,6 +77,7 @@ AI 辅助非代写：AI 做检索、润色、格式、初稿框架，不代写�
 
 版本记录
 
+v1.0.8（2026-08-22）：能力表述校准——DOCX/链接注入无 skill 实现，改为实证过的 PDF/EPUB 主链路；入库规范标注 unified_import 为个人库参考、DOCX/TXT/链接注入未内置
 v1.0.7（2026-08-22）：表述修正——数据源改为实际输入方式（本地 PDF/EPUB/DOCX），清除 Zotero/Obsidian 误导性生态表述，标注 Zotero 补全为未内置参考设计
 v1.0.6（2026-08-22）：平台展示适配——SKILL.md 人读区纯文本化（去 markdown 符号），人味化重写，简介栏文案备好
 v1.0.5（2026-08-22）：平台展示适配——name=wenshu（显示名）+ skill_identifier 固定 ID、简介段前置、人读区去表格化（列表呈现）、删文档树代码块
