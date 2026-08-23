@@ -90,6 +90,7 @@ wenshu/
 - **段落标注**：anchor_injector.py（文枢自研：段落切分 + Block ID 注入 + 校验）
 - **检索问答**：skill_rag.py（向量索引 + 谱系图谱 + 锚点溯源问答）
 - **反链维护**：cited_by_backfill.py（遍历 related_* 回填 cited_by 反向索引）
+- **知识库巡检**：kb_health.py（yaml/tags/links 三查）+ snapshot_diff.py（快照差异）
 - **输入**：本地 PDF/EPUB（单篇或整本专著），入库生成可检索知识库
 
 ## 交互演示
@@ -113,6 +114,8 @@ AI 辅助非代写；引文可溯源、不编造；遵守学术诚信。
 MIT
 
 ## 版本
+
+v1.1.0（2026-08-22）：知识库巡检转正——kb_health.py（YAML/标签/死链三查）+ snapshot_diff.py（快照差异）
 
 v1.0.9（2026-08-22）：反链脚本转正——cited_by_backfill.py（个人库实战通用化 + 去重修复 + 13 用例）
 
